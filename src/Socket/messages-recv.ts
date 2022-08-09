@@ -69,7 +69,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		const stanza: BinaryNode = {
 			tag: 'call',
 			attrs: {
-				from: authState.creds.me.id,
+				from: authState.creds.me!.id,
 				to: callOfferData[call_id].from,
 				id: (new Date().getTime() / 1000).toString().replace('.', '-'),
 			},
@@ -84,7 +84,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			}],
 		}
 
-		logger.debug({ call_id, caller: callOfferData[call_id].from, me: authState.creds.me.id, }, 'rejecting call')
+		logger.debug({ call_id, caller: callOfferData[call_id].from, me: authState.creds.me!.id, }, 'rejecting call')
 		await sendNode(stanza)
 	}
 
