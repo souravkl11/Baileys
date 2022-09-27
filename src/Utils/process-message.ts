@@ -1,3 +1,4 @@
+import { AxiosRequestConfig } from 'axios'
 import type { Logger } from 'pino'
 import { proto } from '../../WAProto'
 import { AuthenticationCreds, BaileysEventEmitter, Chat, GroupMetadata, InitialReceivedChatsState, ParticipantAction, SignalKeyStoreWithTransaction, WAMessageStubType } from '../Types'
@@ -12,6 +13,7 @@ type ProcessMessageContext = {
 	keyStore: SignalKeyStoreWithTransaction
 	ev: BaileysEventEmitter
 	logger?: Logger
+	options: AxiosRequestConfig<any>
 }
 
 const MSG_MISSED_CALL_TYPES = new Set([
@@ -64,7 +66,7 @@ export const shouldIncrementChatUnread = (message: proto.IWebMessageInfo) => (
 
 const processMessage = async(
 	message: proto.IWebMessageInfo,
-	{ downloadHistory, ev, historyCache, recvChats, creds, keyStore, logger }: ProcessMessageContext
+	{ downloadHistory, ev, historyCache, recvChats, creds, keyStore, logger, options }: ProcessMessageContext
 ) => {
 	const meId = creds.me!.id
 	const { accountSettings } = creds
@@ -94,8 +96,13 @@ const processMessage = async(
 			logger?.info({ histNotification, id: message.key.id }, 'got history notification')
 
 			if(downloadHistory) {
-				const isLatest = historyCache.size === 0 && !creds.processedHistoryMessages?.length
-				const { chats, contacts, messages, didProcess } = await downloadAndProcessHistorySyncNotification(histNotification, historyCache, recvChats)
+				const isLatest = !creds.processedHistoryMessages?.length
+				const { chats, contacts, messages, didProcess } = await downloadAndProcessHistorySyncNotification(
+					histNotification,
+					historyCache,
+					recvChats,
+					options
+				)
 
 				if(chats.length) {
 					ev.emit('chats.set', { chats, isLatest })
