@@ -1,5 +1,4 @@
 import { Boom } from '@hapi/boom'
-import { AxiosRequestConfig } from 'axios'
 import type { Logger } from 'pino'
 import { proto } from '../../WAProto'
 import { BaileysEventEmitter, ChatModification, ChatMutation, Contact, InitialAppStateSyncOptions, LastMessageList, LTHashState, WAPatchCreate, WAPatchName } from '../Types'
@@ -274,10 +273,7 @@ export const decodeSyncdPatch = async(
 	return result
 }
 
-export const extractSyncdPatches = async(
-	result: BinaryNode,
-	options: AxiosRequestConfig<any>
-) => {
+export const extractSyncdPatches = async(result: BinaryNode) => {
 	const syncNode = getBinaryNodeChild(result, 'sync')
 	const collectionNodes = getBinaryNodeChildren(syncNode, 'collection')
 
@@ -304,7 +300,7 @@ export const extractSyncdPatches = async(
 					const blobRef = proto.ExternalBlobReference.decode(
                         snapshotNode.content! as Buffer
 					)
-					const data = await downloadExternalBlob(blobRef, options)
+					const data = await downloadExternalBlob(blobRef)
 					snapshot = proto.SyncdSnapshot.decode(data)
 				}
 
@@ -332,11 +328,8 @@ export const extractSyncdPatches = async(
 }
 
 
-export const downloadExternalBlob = async(
-	blob: proto.IExternalBlobReference,
-	options: AxiosRequestConfig<any>
-) => {
-	const stream = await downloadContentFromMessage(blob, 'md-app-state', { options })
+export const downloadExternalBlob = async(blob: proto.IExternalBlobReference) => {
+	const stream = await downloadContentFromMessage(blob, 'md-app-state')
 	const bufferArray: Buffer[] = []
 	for await (const chunk of stream) {
 		bufferArray.push(chunk)
@@ -345,11 +338,8 @@ export const downloadExternalBlob = async(
 	return Buffer.concat(bufferArray)
 }
 
-export const downloadExternalPatch = async(
-	blob: proto.IExternalBlobReference,
-	options: AxiosRequestConfig<any>
-) => {
-	const buffer = await downloadExternalBlob(blob, options)
+export const downloadExternalPatch = async(blob: proto.IExternalBlobReference) => {
+	const buffer = await downloadExternalBlob(blob)
 	const syncData = proto.SyncdMutations.decode(buffer)
 	return syncData
 }
@@ -409,7 +399,6 @@ export const decodePatches = async(
 	initial: LTHashState,
 	getAppStateSyncKey: FetchAppStateSyncKey,
 	onMutation: (mut: ChatMutation) => void,
-	options: AxiosRequestConfig<any>,
 	minimumVersionNumber?: number,
 	logger?: Logger,
 	validateMacs: boolean = true
@@ -427,7 +416,7 @@ export const decodePatches = async(
 		const { version, keyId, snapshotMac } = syncd
 		if(syncd.externalMutations) {
 			logger?.trace({ name, version }, 'downloading external patch')
-			const ref = await downloadExternalPatch(syncd.externalMutations, options)
+			const ref = await downloadExternalPatch(syncd.externalMutations)
 			logger?.debug({ name, version, mutations: ref.mutations.length }, 'downloaded external patch')
 			syncd.mutations?.push(...ref.mutations)
 		}

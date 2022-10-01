@@ -27,12 +27,10 @@ export const makeSocket = ({
 	defaultQueryTimeoutMs,
 	syncFullHistory,
 	transactionOpts,
-	qrTimeout,
-	options,
+	qrTimeout
 }: SocketConfig) => {
 	const ws = new WebSocket(waWebSocketUrl, undefined, {
 		origin: DEFAULT_ORIGIN,
-		headers: options.headers,
 		handshakeTimeout: connectTimeoutMs,
 		timeout: connectTimeoutMs,
 		agent
@@ -398,7 +396,7 @@ export const makeSocket = ({
 	)
 
 	/** logout & invalidate connection */
-	const logout = async(msg?: string) => {
+	const logout = async() => {
 		const jid = authState.creds.me?.id
 		if(jid) {
 			await sendNode({
@@ -421,7 +419,7 @@ export const makeSocket = ({
 			})
 		}
 
-		end(new Boom(msg || 'Intentional Logout', { statusCode: DisconnectReason.loggedOut }))
+		end(new Boom('Intentional Logout', { statusCode: DisconnectReason.loggedOut }))
 	}
 
 	ws.on('message', onMessageRecieved)

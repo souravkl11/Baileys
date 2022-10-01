@@ -7,7 +7,6 @@ import { MEDIA_KEYS, URL_EXCLUDE_REGEX, URL_REGEX, WA_DEFAULT_EPHEMERAL } from '
 import {
 	AnyMediaMessageContent,
 	AnyMessageContent,
-	DownloadableMessage,
 	MediaGenerationOptions,
 	MediaType,
 	MessageContentGenerationOptions,
@@ -36,17 +35,16 @@ type MediaUploadData = {
 	fileName?: string
 	jpegThumbnail?: string
 	mimetype?: string
-	width?: number
-	height?: number
 }
 
-const MIMETYPE_MAP: { [T in MediaType]?: string } = {
+const MIMETYPE_MAP: { [T in MediaType]: string } = {
 	image: 'image/jpeg',
 	video: 'video/mp4',
 	document: 'application/pdf',
 	audio: 'audio/ogg; codecs=opus',
 	sticker: 'image/webp',
-	'product-catalog-image': 'image/jpeg',
+	history: 'application/x-protobuf',
+	'md-app-state': 'application/x-protobuf',
 }
 
 const MessageTypeProto = {
@@ -146,13 +144,15 @@ export const prepareWAMessageMedia = async(
 		fileSha256,
 		fileLength,
 		didSaveToTmpPath
-	} = await encryptedStream(
-		uploadData.media,
-		options.mediaTypeOverride || mediaType,
-		requiresOriginalForSomeProcessing
-	)
+	} = await encryptedStream(uploadData.media, mediaType, requiresOriginalForSomeProcessing)
 	 // url safe Base64 encode the SHA256 hash of the body
-	const fileEncSha256B64 = fileEncSha256.toString('base64')
+	const fileEncSha256B64 = encodeURIComponent(
+		fileEncSha256.toString('base64')
+			.replace(/\+/g, '-')
+			.replace(/\//g, '_')
+			.replace(/\=+$/, '')
+	)
+
 	const [{ mediaUrl, directPath }] = await Promise.all([
 		(async() => {
 			const result = await options.upload(
@@ -165,17 +165,7 @@ export const prepareWAMessageMedia = async(
 		(async() => {
 			try {
 				if(requiresThumbnailComputation) {
-					const {
-						thumbnail,
-						originalImageDimensions
-					} = await generateThumbnail(bodyPath!, mediaType as any, options)
-					uploadData.jpegThumbnail = thumbnail
-					if(!uploadData.width && originalImageDimensions) {
-						uploadData.width = originalImageDimensions.width
-						uploadData.height = originalImageDimensions.height
-						logger?.debug('set dimensions')
-					}
-
+					uploadData.jpegThumbnail = await generateThumbnail(bodyPath!, mediaType as any, options)
 					logger?.debug('generated thumbnail')
 				}
 
@@ -296,17 +286,6 @@ export const generateWAMessageContent = async(
 			extContent.description = urlInfo.description
 			extContent.title = urlInfo.title
 			extContent.previewType = 0
-
-			const img = urlInfo.highQualityThumbnail
-			if(img) {
-				extContent.thumbnailDirectPath = img.directPath
-				extContent.mediaKey = img.mediaKey
-				extContent.mediaKeyTimestamp = img.mediaKeyTimestamp
-				extContent.thumbnailWidth = img.width
-				extContent.thumbnailHeight = img.height
-				extContent.thumbnailSha256 = img.fileSha256
-				extContent.thumbnailEncSha256 = img.fileEncSha256
-			}
 		}
 
 		m.extendedTextMessage = extContent
@@ -715,25 +694,13 @@ export const downloadMediaMessage = async(
 		}
 
 		const contentType = getContentType(mContent)
-		let mediaType = contentType?.replace('Message', '') as MediaType
+		const mediaType = contentType?.replace('Message', '') as MediaType
 		const media = mContent[contentType!]
-
-		if(!media || typeof media !== 'object' || (!('url' in media) && !('thumbnailDirectPath' in media))) {
+		if(!media || typeof media !== 'object' || !('url' in media)) {
 			throw new Boom(`"${contentType}" message is not a media message`)
 		}
 
-		let download: DownloadableMessage
-		if('thumbnailDirectPath' in media && !('url' in media)) {
-			download = {
-				directPath: media.thumbnailDirectPath,
-				mediaKey: media.mediaKey
-			}
-			mediaType = 'thumbnail-link'
-		} else {
-			download = media
-		}
-
-		const stream = await downloadContentFromMessage(download, mediaType, options)
+		const stream = await downloadContentFromMessage(media, mediaType, options)
 		if(type === 'buffer') {
 			const bufferArray: Buffer[] = []
 			for await (const chunk of stream) {
@@ -780,7 +747,9 @@ const generateContextInfo = () => {
  */
 export const patchMessageForMdIfRequired = (message: proto.IMessage) => {
 	const requiresPatch = !!(
-		message.buttonsMessage || message.templateMessage || message.listMessage
+		message.buttonsMessage
+		// || message.templateMessage
+		|| message.listMessage
 	)
 	if(requiresPatch) {
 		message = {

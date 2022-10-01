@@ -1,4 +1,4 @@
-import type { MediaType, SocketConfig } from '../Types'
+import type { CommonSocketConfig, LegacySocketConfig, MediaType, SocketConfig } from '../Types'
 import { Browsers } from '../Utils'
 import logger from '../Utils/logger'
 import { version } from './baileys-version.json'
@@ -26,9 +26,10 @@ export const WA_CERT_DETAILS = {
 	SERIAL: 0,
 }
 
-export const DEFAULT_CONNECTION_CONFIG: SocketConfig = {
+const BASE_CONNECTION_CONFIG: CommonSocketConfig = {
 	version: version as any,
 	browser: Browsers.baileys('Chrome'),
+
 	waWebSocketUrl: 'wss://web.whatsapp.com/ws/chat',
 	connectTimeoutMs: 20_000,
 	keepAliveIntervalMs: 15_000,
@@ -37,7 +38,11 @@ export const DEFAULT_CONNECTION_CONFIG: SocketConfig = {
 	emitOwnEvents: true,
 	defaultQueryTimeoutMs: 60_000,
 	customUploadHosts: [],
-	retryRequestDelayMs: 250,
+	retryRequestDelayMs: 250
+}
+
+export const DEFAULT_CONNECTION_CONFIG: SocketConfig = {
+	...BASE_CONNECTION_CONFIG,
 	fireInitQueries: true,
 	auth: undefined as any,
 	downloadHistory: true,
@@ -45,40 +50,24 @@ export const DEFAULT_CONNECTION_CONFIG: SocketConfig = {
 	syncFullHistory: false,
 	linkPreviewImageThumbnailWidth: 192,
 	transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
-	generateHighQualityLinkPreview: false,
-	options: { },
 	getMessage: async() => undefined
 }
 
-export const MEDIA_PATH_MAP: { [T in MediaType]?: string } = {
+export const DEFAULT_LEGACY_CONNECTION_CONFIG: LegacySocketConfig = {
+	...BASE_CONNECTION_CONFIG,
+	waWebSocketUrl: 'wss://web.whatsapp.com/ws',
+	phoneResponseTimeMs: 20_000,
+	expectResponseTimeout: 60_000,
+}
+
+export const MEDIA_PATH_MAP: { [T in MediaType]: string } = {
 	image: '/mms/image',
 	video: '/mms/video',
 	document: '/mms/document',
 	audio: '/mms/audio',
 	sticker: '/mms/image',
-	'thumbnail-link': '/mms/image',
-	'product-catalog-image': '/product/image',
+	history: '',
 	'md-app-state': ''
-}
-
-export const MEDIA_HKDF_KEY_MAPPING = {
-	'audio': 'Audio',
-	'document': 'Document',
-	'gif': 'Video',
-	'image': 'Image',
-	'ppic': '',
-	'product': 'Image',
-	'ptt': 'Audio',
-	'sticker': 'Image',
-	'video': 'Video',
-	'thumbnail-document': 'Document Thumbnail',
-	'thumbnail-image': 'Image Thumbnail',
-	'thumbnail-video': 'Video Thumbnail',
-	'thumbnail-link': 'Link Thumbnail',
-	'md-msg-hist': 'History',
-	'md-app-state': 'App State',
-	'product-catalog-image': '',
-	'payment-bg-image': 'Payment Background',
 }
 
 export const MEDIA_KEYS = Object.keys(MEDIA_PATH_MAP) as MediaType[]
