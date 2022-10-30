@@ -20,6 +20,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		ev,
 		authState,
 		ws,
+		query,
 		processingMutex,
 		upsertMessage,
 		resyncAppState,
@@ -63,6 +64,26 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 		logger.debug({ recv: { tag, attrs }, sent: stanza.attrs }, 'sent ack')
 		await sendNode(stanza)
+	}
+	
+	const rejectCall = async(callId: string, callFrom: string) => {
+		const stanza: BinaryNode = ({
+			tag: 'call',
+			attrs: {
+				from: authState.creds.me!.id,
+				to: callFrom,
+			},
+			content: [{
+			    tag: 'reject',
+			    attrs: {
+				'call-id': callId,
+				'call-creator': callFrom,
+				count: '0',
+			    },
+			    content: undefined,
+			}],
+		});
+		await query(stanza)
 	}
 
 	const sendRetryRequest = async(node: BinaryNode, forceIncludeKeys = false) => {
@@ -616,6 +637,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 	return {
 		...sock,
 		sendMessageAck,
-		sendRetryRequest
+		sendRetryRequest,
+		rejectCall
 	}
 }
