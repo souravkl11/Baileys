@@ -753,7 +753,7 @@ export const patchMessageForMdIfRequired = (message: proto.IMessage) => {
 	)
 	if(requiresPatch) {
 		message = {
-			viewOnceMessage: {
+			viewOnceMessageV2: {
 				message: {
 					messageContextInfo: generateContextInfo(),
 					...message
